@@ -58,9 +58,18 @@ export default function Home() {
     try {
       setLoading(true)
       console.log('Sending message:', newMessage)
-      const message = await sendMessage(selectedChat.id, newMessage)
-      console.log('Message sent:', message)
-      setMessages(prev => [...prev, message])
+      const response = await sendMessage(selectedChat.id, newMessage)
+      console.log('Message sent:', response)
+      
+      // Create a proper Message object from the response
+      const newMessageObj: Message = {
+        id: Date.now().toString(), // Generate a temporary ID
+        content: response.message,
+        timestamp: Date.now(),
+        sender: 'user'
+      }
+      
+      setMessages(prev => [...prev, newMessageObj])
       setNewMessage('')
     } catch (err) {
       console.error('Error sending message:', err)

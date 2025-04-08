@@ -1,163 +1,211 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Chat, Message, getChats, getMessages, sendMessage } from '@/lib/api'
+import { Chat, Message, checkConnection, getChats, getMessages, sendMessage, getQRCode } from '@/lib/api'
 
 export default function Home() {
   const [chats, setChats] = useState<Chat[]>([])
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
+  const [selectedChat, setSelectedChat] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'waiting_for_qr'>('disconnected')
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [qrCodeUrl, setQRCodeUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    loadChats()
+    const checkStatus = async () => {
+      try {
+        const status = await checkConnection()
+        setConnectionStatus(status.status)
+        setStatusMessage(status.message || null)
+        
+        if (status.status === 'connected') {
+          loadChats()
+        } else if (status.status === 'waiting_for_qr') {
+          try {
+            const url = await getQRCode()
+            setQRCodeUrl(url)
+          } catch (err) {
+            console.error('Error getting QR code:', err)
+            setError('Failed to load QR code')
+          }
+        }
+      } catch (error) {
+        console.error('Error checking status:', error)
+        setError('Failed to check connection status')
+      }
+    }
+
+    const interval = setInterval(checkStatus, 5000)
+    checkStatus() // Initial check
+
+    return () => {
+      clearInterval(interval)
+      if (qrCodeUrl) {
+        URL.revokeObjectURL(qrCodeUrl)
+      }
+    }
   }, [])
 
-  useEffect(() => {
-    if (selectedChat) {
-      loadMessages(selectedChat.id)
-    }
-  }, [selectedChat])
-
-  async function loadChats() {
+  const loadChats = async () => {
     try {
       setLoading(true)
-      console.log('Loading chats...')
       const fetchedChats = await getChats()
-      console.log('Fetched chats:', fetchedChats)
       setChats(fetchedChats)
+      setError(null)
     } catch (err) {
       console.error('Error loading chats:', err)
-      setError(`Failed to load chats: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setError('Failed to load chats')
     } finally {
       setLoading(false)
     }
   }
 
-  async function loadMessages(chatId: string) {
+  const loadMessages = async (chatId: string) => {
     try {
       setLoading(true)
-      console.log('Loading messages for chat:', chatId)
       const fetchedMessages = await getMessages(chatId)
-      console.log('Fetched messages:', fetchedMessages)
       setMessages(fetchedMessages)
+      setError(null)
     } catch (err) {
       console.error('Error loading messages:', err)
-      setError(`Failed to load messages: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setError('Failed to load messages')
     } finally {
       setLoading(false)
     }
   }
 
-  async function handleSendMessage(e: React.FormEvent) {
+  const handleChatSelect = (chatId: string) => {
+    setSelectedChat(chatId)
+    loadMessages(chatId)
+  }
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedChat || !newMessage.trim()) return
 
     try {
-      setLoading(true)
-      console.log('Sending message:', newMessage)
-      const response = await sendMessage(selectedChat.id, newMessage)
-      console.log('Message sent:', response)
-      
-      // Create a proper Message object from the response
-      const newMessageObj: Message = {
-        id: Date.now().toString(), // Generate a temporary ID
-        content: response.message,
-        timestamp: Date.now(),
-        sender: 'user'
+      const result = await sendMessage(selectedChat, newMessage)
+      if (result.success) {
+        setNewMessage('')
+        loadMessages(selectedChat)
+      } else {
+        setError(result.message)
       }
-      
-      setMessages(prev => [...prev, newMessageObj])
-      setNewMessage('')
     } catch (err) {
       console.error('Error sending message:', err)
-      setError(`Failed to send message: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    } finally {
-      setLoading(false)
+      setError('Failed to send message')
     }
   }
 
-  if (error) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-24">
-        <div className="text-red-500 text-xl">{error}</div>
-      </main>
-    )
+  const renderConnectionStatus = () => {
+    switch (connectionStatus) {
+      case 'waiting_for_qr':
+        return (
+          <div className="flex flex-col items-center justify-center p-4 bg-yellow-100 rounded-lg">
+            <p className="text-yellow-800">Please scan the QR code to connect</p>
+            {qrCodeUrl && (
+              <img src={qrCodeUrl} alt="QR Code" className="mt-4 w-64 h-64" />
+            )}
+          </div>
+        )
+      case 'disconnected':
+        return (
+          <div className="p-4 bg-red-100 rounded-lg">
+            <p className="text-red-800">
+              {statusMessage || 'WhatsApp is disconnected. Please wait while we try to reconnect...'}
+            </p>
+          </div>
+        )
+      case 'connected':
+        if (chats.length === 0) {
+          return (
+            <div className="p-4 bg-blue-100 rounded-lg">
+              <p className="text-blue-800">Connected! Loading your chats...</p>
+            </div>
+          )
+        }
+        return null
+    }
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <div className="w-1/4 bg-white border-r">
-        <div className="p-4">
-          <h2 className="text-xl font-semibold mb-4">Chats</h2>
-          {error && <div className="text-red-500 mb-4">{error}</div>}
-          {loading ? (
-            <div>Loading...</div>
-          ) : (
-            <div className="space-y-2">
-              {chats.map(chat => (
-                <div
-                  key={chat.id}
-                  className={`p-3 rounded-lg cursor-pointer ${
-                    selectedChat?.id === chat.id ? 'bg-blue-100' : 'hover:bg-gray-100'
-                  }`}
-                  onClick={() => setSelectedChat(chat)}
-                >
-                  <div className="font-medium">{chat.name}</div>
-                  {chat.lastMessage && (
-                    <div className="text-sm text-gray-500 truncate">{chat.lastMessage}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="flex-1 flex flex-col">
-        {selectedChat ? (
-          <>
-            <div className="p-4 border-b">
-              <h2 className="text-xl font-semibold">{selectedChat.name}</h2>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map(message => (
-                <div
-                  key={message.id}
-                  className={`max-w-[70%] rounded-lg p-3 ${
-                    message.sender === 'user' ? 'bg-blue-500 text-white ml-auto' : 'bg-gray-200'
-                  }`}
-                >
-                  {message.content}
-                </div>
-              ))}
-            </div>
-            <form onSubmit={handleSendMessage} className="p-4 border-t">
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={e => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 p-2 border rounded-lg"
-                />
-                <button
-                  type="submit"
-                  disabled={loading || !newMessage.trim()}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50"
-                >
-                  Send
-                </button>
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm">
+        <h1 className="text-2xl font-bold mb-4">WhatsApp Web Interface</h1>
+        
+        {error && (
+          <div className="p-4 mb-4 bg-red-100 rounded-lg">
+            <p className="text-red-800">{error}</p>
+          </div>
+        )}
+
+        {renderConnectionStatus()}
+
+        {connectionStatus === 'connected' && (
+          <div className="flex gap-4">
+            <div className="w-1/3">
+              <h2 className="text-xl font-semibold mb-2">Chats</h2>
+              <div className="border rounded-lg">
+                {chats.map((chat) => (
+                  <button
+                    key={chat.id}
+                    onClick={() => handleChatSelect(chat.id)}
+                    className={`w-full p-2 text-left hover:bg-gray-100 ${
+                      selectedChat === chat.id ? 'bg-gray-200' : ''
+                    }`}
+                  >
+                    <p className="font-medium">{chat.name}</p>
+                    {chat.lastMessage && (
+                      <p className="text-sm text-gray-600 truncate">{chat.lastMessage}</p>
+                    )}
+                  </button>
+                ))}
               </div>
-            </form>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
-            Select a chat to start messaging
+            </div>
+
+            <div className="w-2/3">
+              <h2 className="text-xl font-semibold mb-2">Messages</h2>
+              <div className="border rounded-lg p-4 h-[500px] flex flex-col">
+                <div className="flex-1 overflow-y-auto mb-4">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`mb-2 p-2 rounded-lg ${
+                        message.sender === 'user' ? 'bg-blue-100 ml-auto' : 'bg-gray-100'
+                      }`}
+                    >
+                      <p>{message.content}</p>
+                      <p className="text-xs text-gray-600">
+                        {new Date(message.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <form onSubmit={handleSendMessage} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 p-2 border rounded"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!selectedChat || !newMessage.trim()}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300"
+                  >
+                    Send
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         )}
       </div>
-    </div>
+    </main>
   )
 } 

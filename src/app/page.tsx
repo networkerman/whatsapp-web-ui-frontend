@@ -13,45 +13,70 @@ export default function Home() {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'waiting_for_qr'>('disconnected')
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [qrCodeUrl, setQRCodeUrl] = useState<string | null>(null)
+  const [qrCodeLoading, setQRCodeLoading] = useState(false)
+  const [syncingChats, setSyncingChats] = useState(false)
+
+  const checkStatus = async () => {
+    try {
+      const status = await checkConnection()
+      const wasWaitingForQR = connectionStatus === 'waiting_for_qr'
+      setConnectionStatus(status.status)
+      setStatusMessage(status.message || null)
+      
+      if (status.status === 'connected') {
+        // Clear QR code and load chats when connected
+        if (qrCodeUrl) {
+          URL.revokeObjectURL(qrCodeUrl)
+          setQRCodeUrl(null)
+        }
+        loadChats()
+      } else if (status.status === 'waiting_for_qr' && !qrCodeUrl && !qrCodeLoading && !wasWaitingForQR) {
+        // Only fetch QR code if we don't have one and just entered waiting_for_qr state
+        try {
+          setQRCodeLoading(true)
+          const url = await getQRCode()
+          setQRCodeUrl(url)
+          setError(null)
+        } catch (err) {
+          console.error('Error getting QR code:', err)
+          setError('Failed to load QR code. Please refresh the page to try again.')
+        } finally {
+          setQRCodeLoading(false)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking status:', error)
+      setError('Failed to check connection status')
+    }
+  }
 
   useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const status = await checkConnection()
-        setConnectionStatus(status.status)
-        setStatusMessage(status.message || null)
-        
-        if (status.status === 'connected') {
-          loadChats()
-        } else if (status.status === 'waiting_for_qr') {
-          try {
-            const url = await getQRCode()
-            setQRCodeUrl(url)
-          } catch (err) {
-            console.error('Error getting QR code:', err)
-            setError('Failed to load QR code')
-          }
-        }
-      } catch (error) {
-        console.error('Error checking status:', error)
-        setError('Failed to check connection status')
-      }
-    }
+    let interval: NodeJS.Timeout | null = null;
+    
+    const startPolling = () => {
+      // Poll every 5 seconds when disconnected or waiting for QR
+      // Poll every 30 seconds when connected
+      const pollInterval = connectionStatus === 'connected' ? 30000 : 5000;
+      interval = setInterval(checkStatus, pollInterval);
+    };
 
-    const interval = setInterval(checkStatus, 5000)
-    checkStatus() // Initial check
+    // Initial check
+    checkStatus();
+    startPolling();
 
     return () => {
-      clearInterval(interval)
-      if (qrCodeUrl) {
-        URL.revokeObjectURL(qrCodeUrl)
+      if (interval) {
+        clearInterval(interval);
       }
-    }
-  }, [])
+      if (qrCodeUrl) {
+        URL.revokeObjectURL(qrCodeUrl);
+      }
+    };
+  }, [connectionStatus]); // Restart polling when connection status changes
 
   const loadChats = async () => {
     try {
-      setLoading(true)
+      setSyncingChats(true)
       const fetchedChats = await getChats()
       setChats(fetchedChats)
       setError(null)
@@ -59,6 +84,7 @@ export default function Home() {
       console.error('Error loading chats:', err)
       setError('Failed to load chats')
     } finally {
+      setSyncingChats(false)
       setLoading(false)
     }
   }
@@ -104,11 +130,54 @@ export default function Home() {
     switch (connectionStatus) {
       case 'waiting_for_qr':
         return (
-          <div className="flex flex-col items-center justify-center p-4 bg-yellow-100 rounded-lg">
-            <p className="text-yellow-800">Please scan the QR code to connect</p>
-            {qrCodeUrl && (
-              <img src={qrCodeUrl} alt="QR Code" className="mt-4 w-64 h-64" />
-            )}
+          <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+            <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+              <h1 className="text-2xl font-bold text-center mb-6">WhatsApp Bridge</h1>
+              
+              <div className="flex flex-col items-center space-y-4">
+                <div className="relative p-6 bg-white rounded-xl shadow-lg max-w-md mx-auto mt-6">
+                <h3 className="text-lg font-semibold text-blue-800 mb-4">Scan QR Code with WhatsApp</h3>
+                <div className="relative">
+                  <img 
+                    src={qrCodeUrl || undefined} 
+                    alt="QR Code" 
+                    className="w-64 h-64 border-2 border-blue-400 rounded-lg shadow-md mx-auto"
+                    onError={(e) => {
+                      console.error('Error loading QR code image');
+                      setError('Failed to load QR code image. Please refresh to try again.');
+                      e.currentTarget.style.display = 'none';
+                    }}
+                    onLoad={() => {
+                      console.log('QR code image loaded successfully');
+                      setError(null);
+                    }}
+                  />
+                  
+                  {/* Prominently positioned refresh button */}
+                  <button
+                    onClick={() => {
+                      setQRCodeUrl(null);
+                      setError(null);
+                      checkStatus();
+                    }}
+                    className="absolute bottom-2 right-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center space-x-1"
+                    aria-label="Refresh QR Code"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                    </svg>
+                    <span>Refresh QR</span>
+                  </button>
+                </div>
+                <p className="text-gray-600 text-sm mt-4 text-center">
+                  Open WhatsApp on your phone &gt; Settings &gt; Linked Devices &gt; Link a Device
+                </p>
+                </div>
+                <p className="text-sm text-gray-600 text-center">
+                  Scan this QR code with WhatsApp on your phone
+                </p>
+              </div>
+            </div>
           </div>
         )
       case 'disconnected':
@@ -120,10 +189,21 @@ export default function Home() {
           </div>
         )
       case 'connected':
+        if (syncingChats) {
+          return (
+            <div className="p-4 bg-blue-100 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-800"></div>
+                <p className="text-blue-800">Connected! Syncing your chats...</p>
+              </div>
+              <p className="text-sm text-blue-600 mt-2">This might take a few moments depending on your chat history.</p>
+            </div>
+          )
+        }
         if (chats.length === 0) {
           return (
             <div className="p-4 bg-blue-100 rounded-lg">
-              <p className="text-blue-800">Connected! Loading your chats...</p>
+              <p className="text-blue-800">No chats found. Start a conversation to see it here!</p>
             </div>
           )
         }

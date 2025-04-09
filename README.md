@@ -1,134 +1,97 @@
-# WhatsApp Web UI Frontend
+# WhatsApp Web Interface
 
-A modern web interface for WhatsApp messaging, built with Next.js and Tailwind CSS.
+A modern web interface for WhatsApp, built with Next.js and TypeScript.
 
-## Project Overview
+## Features
 
-This is the frontend component of a WhatsApp-like messaging application. It connects to a backend API server deployed on Railway.
+- 🔒 Secure WhatsApp connection using official WhatsApp Web protocol
+- 💬 View and send messages
+- 📱 Mobile-friendly interface
+- 🔄 Real-time chat synchronization
+- 🎨 Modern UI with Tailwind CSS
 
-### Key Features
-- Real-time chat interface
-- Chat list with last message preview
-- Message history viewing
-- Message sending functionality
-- Responsive design with Tailwind CSS
+## Connection Process
 
-## Tech Stack
-- **Framework**: Next.js 14
-- **Styling**: Tailwind CSS
-- **Type Safety**: TypeScript
-- **Deployment**: Netlify
-- **API Integration**: RESTful API calls
+1. **Initial Connection**
+   - When you first open the app, you'll see a QR code
+   - Scan this QR code with your WhatsApp mobile app:
+     1. Open WhatsApp on your phone
+     2. Go to Settings > Linked Devices
+     3. Tap "Link a Device"
+     4. Scan the QR code shown in the web interface
 
-## Project Structure
-```
-src/
-├── app/                 # Next.js app directory
-│   ├── page.tsx        # Main chat interface
-│   ├── layout.tsx      # Root layout
-│   └── globals.css     # Global styles
-└── lib/
-    └── api.ts          # API integration functions
-```
+2. **Synchronization**
+   - After scanning the QR code, the app will start syncing your chats
+   - This process may take a few moments depending on your chat history
+   - You'll see a loading indicator while synchronization is in progress
+   - Once complete, your chats will appear in the left sidebar
 
-## Environment Variables
-Required environment variable:
-```
-NEXT_PUBLIC_API_URL=https://uday-whatsapp-production.up.railway.app
-```
+3. **Session Management**
+   - Your session remains active until you log out
+   - You can use the same WhatsApp account on up to 4 linked devices
+   - The connection is end-to-end encrypted
 
-## Local Development
+## Development
+
+### Prerequisites
+
+- Node.js 18 or later
+- npm or yarn
+- A WhatsApp account
+
+### Setup
 
 1. Clone the repository:
-```bash
-git clone https://github.com/networkerman/whatsapp-web-ui-frontend.git
-cd whatsapp-web-ui-frontend
-```
+   ```bash
+   git clone https://github.com/your-username/whatsapp-web-ui-frontend.git
+   cd whatsapp-web-ui-frontend
+   ```
 
 2. Install dependencies:
-```bash
-npm install
-```
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-3. Set up environment variables:
-```bash
-echo "NEXT_PUBLIC_API_URL=https://uday-whatsapp-production.up.railway.app" > .env.local
-```
+3. Create a `.env.local` file:
+   ```
+   NEXT_PUBLIC_API_URL=http://localhost:8080
+   ```
 
-4. Run the development server:
-```bash
-npm run dev
-```
+4. Start the development server:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
 
 ## Deployment
 
-The application is deployed on Netlify at https://messageai.netlify.app
+The app is automatically deployed to Netlify when changes are pushed to the main branch.
 
-### Deployment Configuration
+### Environment Variables
+
+Make sure to set these environment variables in your Netlify dashboard:
+
+- `NEXT_PUBLIC_API_URL`: URL of your WhatsApp bridge backend API
+
+### Build Settings
+
+The following build settings are configured in `netlify.toml`:
+
 - Build command: `npm install && npm run build`
-- Publish directory: `.next`
-- Environment variables are set in Netlify dashboard
-
-### Netlify Configuration
-```toml
-[build]
-  command = "npm install && npm run build"
-  publish = ".next"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-```
-
-## API Integration
-
-The frontend communicates with the backend API through the following endpoints:
-
-- `GET /api/chats` - Fetch all chats
-- `GET /api/messages/{chatId}` - Fetch messages for a specific chat
-- `POST /api/messages/{chatId}` - Send a new message
-
-## Known Issues and Solutions
-
-1. **Type Error in Message Handling**
-   - Issue: Type mismatch between API response and Message interface
-   - Solution: Transform API response into proper Message object in handleSendMessage function
-   - Location: `src/app/page.tsx`
-
-2. **CORS Configuration**
-   - Issue: Cross-origin requests blocked
-   - Solution: Backend CORS configuration updated to allow requests from messageai.netlify.app
-
-## Troubleshooting
-
-If you encounter issues:
-
-1. Check the API connection:
-```bash
-curl -v https://uday-whatsapp-production.up.railway.app/api/chats
-```
-
-2. Verify environment variables:
-```bash
-echo $NEXT_PUBLIC_API_URL
-```
-
-3. Check Netlify deployment logs:
-```bash
-npx netlify-cli logs
-```
+- Publish directory: `out`
+- Node version: 18
 
 ## Contributing
 
-1. Create a new branch for your feature
-2. Make your changes
-3. Test locally
-4. Submit a pull request
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License. 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 

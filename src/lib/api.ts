@@ -106,16 +106,48 @@ export async function sendMessage(chatId: string, message: string): Promise<{ su
 }
 
 export async function getQRCode(): Promise<string> {
-  try {
-    const response = await fetch(`${API_URL}/api/qr`);
-    if (!response.ok) {
-      throw new Error(`Failed to get QR code: ${response.status} ${response.statusText}`);
-    }
-    // Convert the image to a data URL
-    const blob = await response.blob();
-    return URL.createObjectURL(blob);
-  } catch (error) {
-    console.error('Error getting QR code:', error);
-    throw error;
+  console.log('Fetching QR code from:', `${API_URL}/api/qr`);
+  
+  const response = await fetch(`${API_URL}/api/qr`, {
+    headers: {
+      'Accept': 'image/png',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    },
+    cache: 'no-store'
+  });
+
+  console.log('QR code response:', {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries()),
+    contentType: response.headers.get('content-type'),
+    contentLength: response.headers.get('content-length')
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('QR code error:', errorText);
+    throw new Error(`Failed to get QR code: ${response.status} ${response.statusText} - ${errorText}`);
   }
+
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('image/png')) {
+    console.error('Invalid content type:', contentType);
+    throw new Error(`Expected image/png but got ${contentType}`);
+  }
+
+  const blob = await response.blob();
+  console.log('QR code blob:', {
+    size: blob.size,
+    type: blob.type
+  });
+
+  if (blob.size === 0) {
+    throw new Error('Received empty QR code image');
+  }
+
+  const url = URL.createObjectURL(blob);
+  console.log('Created QR code URL:', url);
+  return url;
 } 

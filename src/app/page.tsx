@@ -136,46 +136,64 @@ export default function Home() {
               
               <div className="flex flex-col items-center space-y-4">
                 <div className="relative p-6 bg-white rounded-xl shadow-lg max-w-md mx-auto mt-6">
-                <h3 className="text-lg font-semibold text-blue-800 mb-4">Scan QR Code with WhatsApp</h3>
-                <div className="relative">
-                  <img 
-                    src={qrCodeUrl || undefined} 
-                    alt="QR Code" 
-                    className="w-64 h-64 border-2 border-blue-400 rounded-lg shadow-md mx-auto"
-                    onError={(e) => {
-                      console.error('Error loading QR code image');
-                      setError('Failed to load QR code image. Please refresh to try again.');
-                      e.currentTarget.style.display = 'none';
-                    }}
-                    onLoad={() => {
-                      console.log('QR code image loaded successfully');
-                      setError(null);
-                    }}
-                  />
-                  
-                  {/* Prominently positioned refresh button */}
-                  <button
-                    onClick={() => {
-                      setQRCodeUrl(null);
-                      setError(null);
-                      checkStatus();
-                    }}
-                    className="absolute bottom-2 right-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center space-x-1"
-                    aria-label="Refresh QR Code"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                    </svg>
-                    <span>Refresh QR</span>
-                  </button>
+                  <h3 className="text-lg font-semibold text-blue-800 mb-4">Scan QR Code with WhatsApp</h3>
+                  <div className="relative">
+                    {qrCodeLoading ? (
+                      <div className="w-64 h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                      </div>
+                    ) : (
+                      <img 
+                        src={qrCodeUrl || undefined} 
+                        alt="QR Code" 
+                        className="w-64 h-64 border-2 border-blue-400 rounded-lg shadow-md mx-auto"
+                        onError={(e) => {
+                          console.error('Error loading QR code image');
+                          setError('Failed to load QR code image. Please refresh to try again.');
+                          e.currentTarget.style.display = 'none';
+                        }}
+                        onLoad={() => {
+                          console.log('QR code image loaded successfully');
+                          setError(null);
+                        }}
+                      />
+                    )}
+                    
+                    {/* Prominently positioned refresh button */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          setQRCodeLoading(true);
+                          setQRCodeUrl(null);
+                          setError(null);
+                          // Explicitly request a fresh QR code with the refresh parameter
+                          const url = await getQRCode(true);
+                          setQRCodeUrl(url);
+                        } catch (err) {
+                          console.error('Error refreshing QR code:', err);
+                          setError('Failed to refresh QR code. Please try again.');
+                        } finally {
+                          setQRCodeLoading(false);
+                        }
+                      }}
+                      className="absolute bottom-2 right-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center space-x-1"
+                      aria-label="Refresh QR Code"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                      </svg>
+                      <span>Refresh QR</span>
+                    </button>
+                  </div>
+                  <p className="text-gray-600 text-sm mt-4 text-center">
+                    Open WhatsApp on your phone &gt; Settings &gt; Linked Devices &gt; Link a Device
+                  </p>
                 </div>
-                <p className="text-gray-600 text-sm mt-4 text-center">
-                  Open WhatsApp on your phone &gt; Settings &gt; Linked Devices &gt; Link a Device
-                </p>
-                </div>
-                <p className="text-sm text-gray-600 text-center">
-                  Scan this QR code with WhatsApp on your phone
-                </p>
+                {error && (
+                  <div className="p-4 bg-red-50 rounded-lg">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

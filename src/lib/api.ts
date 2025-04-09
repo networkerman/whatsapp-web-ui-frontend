@@ -105,13 +105,14 @@ export async function sendMessage(chatId: string, message: string): Promise<{ su
   }
 }
 
-export async function getQRCode(): Promise<string> {
-  console.log('Fetching QR code from:', `${API_URL}/api/qr`);
+export async function getQRCode(refresh: boolean = false): Promise<string> {
+  const fetchUrl = refresh ? `${API_URL}/api/qr?refresh=true&t=${Date.now()}` : `${API_URL}/api/qr?t=${Date.now()}`;
+  console.log('Fetching QR code from:', fetchUrl);
   
-  const response = await fetch(`${API_URL}/api/qr`, {
+  const response = await fetch(fetchUrl, {
     headers: {
       'Accept': 'image/png',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache'
     },
     cache: 'no-store'
@@ -147,7 +148,7 @@ export async function getQRCode(): Promise<string> {
     throw new Error('Received empty QR code image');
   }
 
-  const url = URL.createObjectURL(blob);
-  console.log('Created QR code URL:', url);
-  return url;
+  const objectUrl = URL.createObjectURL(blob);
+  console.log('Created QR code URL:', objectUrl);
+  return objectUrl;
 } 
